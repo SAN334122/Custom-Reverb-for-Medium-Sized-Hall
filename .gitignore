@@ -1,0 +1,10 @@
+build/
+.cmake/
+CMakeFiles/
+CMakeCache.txt
+.DS_Store
+.vscode/
+.idea/
+.xcodeproj/
+*.xcodeproj/
+*.xcworkspace
