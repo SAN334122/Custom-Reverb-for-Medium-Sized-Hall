@@ -28,6 +28,15 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     CustomFreeverbAudioProcessor& audioProcessor;
+    
+    // Sliders & Labels
+    juce::Slider dryWetSlider;
+    juce::Label dryWetLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dryWetAttachment;
+
+    juce::Slider roomSizeSlider;
+    juce::Label roomSizeLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> roomSizeAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomFreeverbAudioProcessorEditor)
 };

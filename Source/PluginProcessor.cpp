@@ -9,6 +9,64 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
+
+CustomFreeverbAudioProcessorEditor::CustomFreeverbAudioProcessorEditor (CustomFreeverbAudioProcessor& p)
+    : AudioProcessorEditor (&p), audioProcessor (p)
+{
+    // --- DRY / WET SLIDER ---
+    dryWetSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    dryWetSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
+    addAndMakeVisible(dryWetSlider);
+
+    dryWetLabel.setText("Dry/Wet", juce::dontSendNotification);
+    dryWetLabel.setJustificationType(juce::Justification::centred);
+    dryWetLabel.attachToComponent(&dryWetSlider, false);
+    addAndMakeVisible(dryWetLabel);
+
+    dryWetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.apvts, "dry_wet", dryWetSlider);
+
+    // --- ROOM SIZE SLIDER ---
+    roomSizeSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    roomSizeSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
+    addAndMakeVisible(roomSizeSlider);
+
+    roomSizeLabel.setText("Room Size", juce::dontSendNotification);
+    roomSizeLabel.setJustificationType(juce::Justification::centred);
+    roomSizeLabel.attachToComponent(&roomSizeSlider, false);
+    addAndMakeVisible(roomSizeLabel);
+
+    roomSizeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.apvts, "room_size", roomSizeSlider);
+
+    setSize (400, 250);
+}
+
+CustomFreeverbAudioProcessorEditor::~CustomFreeverbAudioProcessorEditor() {}
+
+void CustomFreeverbAudioProcessorEditor::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colour (0xff1f242d));
+
+    g.setColour (juce::Colours::white);
+    g.setFont (20.0f);
+    g.drawText ("Custom Freeverb", getLocalBounds().removeFromTop(40), juce::Justification::centred, true);
+}
+
+void CustomFreeverbAudioProcessorEditor::resized()
+{
+    auto area = getLocalBounds().reduced(20);
+    area.removeFromTop(30); // Save space for title
+
+    auto sliderWidth = 120;
+    auto sliderHeight = 140;
+
+    dryWetSlider.setBounds(area.removeFromLeft(sliderWidth).withHeight(sliderHeight).withY(70));
+    roomSizeSlider.setBounds(area.removeFromRight(sliderWidth).withHeight(sliderHeight).withY(70));
+}
+
 //==============================================================================
 CustomFreeverbAudioProcessor::CustomFreeverbAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -19,15 +77,37 @@ CustomFreeverbAudioProcessor::CustomFreeverbAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
 #endif
+     apvts (*this, nullptr, "Parameters", createParameterLayout())
 {
+    dryWetParam   = apvts.getRawParameterValue ("dry_wet");
+    roomSizeParam = apvts.getRawParameterValue ("room_size");
 }
 
 CustomFreeverbAudioProcessor::~CustomFreeverbAudioProcessor()
 {
 }
+juce::AudioProcessorValueTreeState::ParameterLayout CustomFreeverbAudioProcessor::createParameterLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
+    layout.add (std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID { "dry_wet", 1 },
+        "Dry / Wet",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
+        0.30f // Default 30% Wet
+    ));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID { "room_size", 1 },
+        "Room Size",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
+        0.50f // Default 0.50
+    ));
+
+    return layout;
+}
 //==============================================================================
 const juce::String CustomFreeverbAudioProcessor::getName() const
 {
@@ -105,6 +185,9 @@ void CustomFreeverbAudioProcessor::prepareToPlay (double sampleRate, int samples
     // Preparing Early Reflections modules
     earlyReflectionsL.prepare(sampleRate);
     earlyReflectionsR.prepare(sampleRate);
+    
+    float initialRoomSize = roomSizeParam != nullptr ? roomSizeParam->load() : 0.50f;
+    float initialFeedback = initialRoomSize * 0.28f + 0.70f;
 
     // Scaling delay lengths for Left and Right channels
     for(int i = 0; i < 8; ++i)
@@ -112,8 +195,8 @@ void CustomFreeverbAudioProcessor::prepareToPlay (double sampleRate, int samples
         int scaledCombL = static_cast<int>(std::round(baseCombLengths[i] * scaleFactor));
         int scaledCombR = static_cast<int>(std::round((baseCombLengths[i] + baseStereoSpread) * scaleFactor));
         
-        lbcfL[i].prepare(scaledCombL, 0.84f, 0.20f);
-        lbcfR[i].prepare(scaledCombR, 0.84f, 0.20f);
+        lbcfL[i].prepare(scaledCombL, initialFeedback, 0.20f);
+        lbcfR[i].prepare(scaledCombR, initialFeedback, 0.20f);
     }
     
     for(int i = 0; i < 4; ++i)
@@ -137,28 +220,18 @@ void CustomFreeverbAudioProcessor::releaseResources()
 #ifndef JucePlugin_PreferredChannelConfigurations
 bool CustomFreeverbAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
-  #if JucePlugin_IsMidiEffect
-    juce::ignoreUnused (layouts);
-    return true;
-  #else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
-    // Some plugin hosts, such as certain GarageBand versions, will only
-    // load plugins that support stereo bus layouts.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+   if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
+    && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
-    // This checks if the input layout matches the output layout
-   #if ! JucePlugin_IsSynth
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
         return false;
-   #endif
 
     return true;
-  #endif
 }
-#endif
+
+  #endif
+
 
 void CustomFreeverbAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
@@ -169,8 +242,24 @@ void CustomFreeverbAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
-
-    auto* leftChannel = buffer.getWritePointer(0);
+        
+        // --- READ GUI PARAMETER VALUES ---
+        float dryWet = dryWetParam->load();
+        float roomSize = roomSizeParam->load();
+        
+        // Freeverb room size to comb feedback mapping
+       float combFeedback = (roomSize * 0.28f) + 0.70f;
+       
+       // Update comb filter feedback gains
+    for (int i = 0; i < 8; ++i) {
+        lbcfL[i].setFeedback(combFeedback);
+        lbcfR[i].setFeedback(combFeedback);
+    }
+    
+    float dryGain = 1.0f - dryWet;
+    float wetGain = dryWet;
+    
+    auto* leftChannel  = buffer.getWritePointer(0);
     auto* rightChannel = totalNumOutputChannels > 1 ? buffer.getWritePointer(1) : nullptr;
 
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
@@ -205,13 +294,10 @@ void CustomFreeverbAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
             apfOutR = apfR[i].processSample(apfOutR);
         }
         
-        // Output Mixing (70% Dry, 15% Early Reflections, 15% Late Tail)
-        float dryGain = 0.70f;
-        float erGain = 0.15f;
-        float tailGain = 0.15f;
         
-        float wetL = (erL * erGain) + (apfOutL * tailGain);
-        float wetR = (erR * erGain) + (apfOutR * tailGain);
+        // --- WET SUM (Equal mix between ER and Tail) ---
+        float wetL = (erL * 0.5f) + (apfOutL * 0.5f);
+        float wetR = (erR * 0.5f) + (apfOutR * 0.5f);
         
         leftChannel[sample] = (dryLeft * dryGain) + wetL;
         if(rightChannel != nullptr)
@@ -235,15 +321,17 @@ juce::AudioProcessorEditor* CustomFreeverbAudioProcessor::createEditor()
 //==============================================================================
 void CustomFreeverbAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    auto state = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    copyXmlToBinary (*xml, destData);  
 }
 
 void CustomFreeverbAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName (apvts.state.getType()))
+            apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
 //==============================================================================

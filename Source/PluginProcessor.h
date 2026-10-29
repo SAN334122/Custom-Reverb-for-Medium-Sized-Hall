@@ -54,9 +54,19 @@ public:
     //==============================================================================
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+    
+    // --- APVTS State Manager ---
+    juce::AudioProcessorValueTreeState apvts;
+    
+    //==============================================================================
 
 private:
-    //==============================================================================
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    // Raw atomic parameter pointers for real-time DSP
+    std::atomic<float>* dryWetParam = nullptr;
+    std::atomic<float>* roomSizeParam = nullptr;
+    
     // Left Channel DSP Chain
     EarlyReflections earlyReflectionsL;
     CombFilter lbcfL[8];

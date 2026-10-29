@@ -11,6 +11,11 @@ public:
         writePtr = 0;
         filterState = 0.0f;
     }
+    
+    // Dynamic feedback update method for Room Size parameter
+    void setFeedback(float newG) {
+        g = newG;
+    }
 
     inline float processSample(float input) {
         if (delayLen == 0) return input;
