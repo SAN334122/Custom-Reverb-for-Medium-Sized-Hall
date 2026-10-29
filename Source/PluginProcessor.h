@@ -57,10 +57,15 @@ public:
 
 private:
     //==============================================================================
-    // 8 Parallel Low-Pass Feedback Comb Filters & 4 Series All-Pass Filters
-    std::array<LowPassFeedbackCombFilter, 8> lbcf;
-    std::array<AllPassFilter, 4> apf;
-    EarlyReflections earlyReflections; // Early Reflection Engine
+    // Left Channel DSP Chain
+    EarlyReflections earlyReflectionsL;
+    CombFilter lbcfL[8];
+    AllPassFilter apfL[4];
+    
+    // Right Channel DSP Chain
+    EarlyReflections earlyReflectionsR;
+    CombFilter lbcfR[8];
+    AllPassFilter apfR[4];
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomFreeverbAudioProcessor)
 };

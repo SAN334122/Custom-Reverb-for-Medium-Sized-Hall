@@ -36,3 +36,4 @@ private:
     float filterState = 0.0f;
 };
 
+using CombFilter = LowPassFeedbackCombFilter;

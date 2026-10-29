@@ -93,26 +93,39 @@ void CustomFreeverbAudioProcessor::changeProgramName (int index, const juce::Str
 //==============================================================================
 void CustomFreeverbAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Initialize Early Reflections ring buffer
-    earlyReflections.prepare(sampleRate);
+    
     // Classic Jezar Freeverb delay lengths calibrated for 44.1 kHz
-    const int baseLbcfDelays[8] = {1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617};
-    const int baseApfDelays[4]  = {225, 341, 441, 556};
-
+    const int baseCombLengths[8] = {1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617};
+    const int baseApfLengths[4]  = {225, 341, 441, 556};
+    const int baseStereoSpread = 23;
+    
     // Scale delay buffer lengths proportionally if running at 48kHz, 88.2kHz, or 96kHz
-    const float scale = static_cast<float>(sampleRate) / 44100.0f;
+    const double scaleFactor = sampleRate / 44100.0;
+    
+    // Preparing Early Reflections modules
+    earlyReflectionsL.prepare(sampleRate);
+    earlyReflectionsR.prepare(sampleRate);
 
-    // Initialize 8 LBCFs (feedback ~0.84, damping ~0.2)
-    for (int i = 0; i < 8; ++i) {
-        int delay = static_cast<int>(baseLbcfDelays[i] * scale);
-        lbcf[i].prepare(delay, 0.84f, 0.20f);
+    // Scaling delay lengths for Left and Right channels
+    for(int i = 0; i < 8; ++i)
+    {
+        int scaledCombL = static_cast<int>(std::round(baseCombLengths[i] * scaleFactor));
+        int scaledCombR = static_cast<int>(std::round((baseCombLengths[i] + baseStereoSpread) * scaleFactor));
+        
+        lbcfL[i].prepare(scaledCombL, 0.84f, 0.20f);
+        lbcfR[i].prepare(scaledCombR, 0.84f, 0.20f);
     }
+    
+    for(int i = 0; i < 4; ++i)
+    {
+        int scaledApfL = static_cast<int>(std::round(baseApfLengths[i] * scaleFactor));
+        int scaledApfR = static_cast<int>(std::round((baseApfLengths[i] + baseStereoSpread) * scaleFactor));
+        
+        apfL[i].prepare(scaledApfL, 0.5f);
+        apfR[i].prepare(scaledApfR, 0.5f);
+    }
+    
 
-    // Initialize 4 APFs (feedback = 0.5)
-    for (int i = 0; i < 4; ++i) {
-        int delay = static_cast<int>(baseApfDelays[i] * scale);
-        apf[i].prepare(delay, 0.5f);
-    }
 }
 
 void CustomFreeverbAudioProcessor::releaseResources()
@@ -162,33 +175,48 @@ void CustomFreeverbAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
 
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
-        float inSample = leftChannel[sample];
+        // Reading Left and Right Channels independetly
+        float dryLeft = leftChannel[sample];
+        float dryRight = (rightChannel != nullptr) ? rightChannel[sample] : dryLeft;
         
-        // 1. Scaling down the audio entering the reverb network to prevent gain buildup
         // Jezar's classic Freeverb input tuning factor is 0.015
-        float reverbInput = inSample * 0.015f;
+        float inputL = dryLeft * 0.015f;
+        float inputR = dryRight * 0.015f;
         
-        // 2. Process Discrete Early Reflections
-        float erOut = earlyReflections.processSample(reverbInput);
-
-        // 3. Parallel LBCF Summation
-        float lbcfSum = 0.0f;
+        // ---Left Channel DSP Engine---
+        float erL = earlyReflectionsL.processSample(inputL);
+        float lbcfSumL = 0.0f;
         for (int i = 0; i < 8; ++i) {
-            lbcfSum += lbcf[i].processSample(reverbInput);
+            lbcfSumL += lbcfL[i].processSample(inputL);
         }
-
-        // 4. Series APF Diffusion Pass
-        float apfOut = lbcfSum;
+        float apfOutL = lbcfSumL;
         for (int i = 0; i < 4; ++i) {
-            apfOut = apf[i].processSample(apfOut);
+            apfOutL = apfL[i].processSample(apfOutL);
         }
-
-        // 5. Dry/Wet Mix (70% Dry, 15% Early Reflections ,15% Reverb Tail)
-        float outputSample = (inSample * 0.79f) +(erOut * 0.15f) + (apfOut * 0.15f);
-
-        leftChannel[sample] = outputSample;
-        if (rightChannel != nullptr) {
-            rightChannel[sample] = outputSample;
+        
+        // --- RIGHT CHANNEL DSP ENGINE ---
+        float erR = earlyReflectionsR.processSample(inputR);
+        float lbcfSumR = 0.0f;
+        for (int i = 0; i < 8; ++i) {
+            lbcfSumR += lbcfR[i].processSample(inputR);
+        }
+        float apfOutR = lbcfSumR;
+        for (int i = 0; i < 4; ++i) {
+            apfOutR = apfR[i].processSample(apfOutR);
+        }
+        
+        // Output Mixing (70% Dry, 15% Early Reflections, 15% Late Tail)
+        float dryGain = 0.70f;
+        float erGain = 0.15f;
+        float tailGain = 0.15f;
+        
+        float wetL = (erL * erGain) + (apfOutL * tailGain);
+        float wetR = (erR * erGain) + (apfOutR * tailGain);
+        
+        leftChannel[sample] = (dryLeft * dryGain) + wetL;
+        if(rightChannel != nullptr)
+        {
+            rightChannel[sample] = (dryRight * dryGain) + wetR;
         }
     }
 }
