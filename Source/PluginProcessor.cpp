@@ -174,9 +174,9 @@ void CustomFreeverbAudioProcessor::changeProgramName (int index, const juce::Str
 void CustomFreeverbAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     
-    // Classic Jezar Freeverb delay lengths calibrated for 44.1 kHz
-    const int baseCombLengths[8] = {1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617};
-    const int baseApfLengths[4]  = {225, 341, 441, 556};
+    // 4 LBCFS and 2 APFs added with changing the number of samples for the LBFC to replicate a medium hall
+    const int baseCombLengths[12] = {1559, 1733, 1931, 2111, 2309, 2531, 2741, 2999, 3229, 3469, 3733, 4001};
+    const int baseApfLengths[6]  = {225, 341, 441, 556, 673, 811};
     const int baseStereoSpread = 23;
     
     // Scale delay buffer lengths proportionally if running at 48kHz, 88.2kHz, or 96kHz
@@ -268,9 +268,9 @@ void CustomFreeverbAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
         float dryLeft = leftChannel[sample];
         float dryRight = (rightChannel != nullptr) ? rightChannel[sample] : dryLeft;
         
-        // Jezar's classic Freeverb input tuning factor is 0.015
-        float inputL = dryLeft * 0.015f;
-        float inputR = dryRight * 0.015f;
+        // Jezar's classic Freeverb input tuning factor is 0.015 ---> New scaling factor is 0.010 
+        float inputL = dryLeft * 0.010f;
+        float inputR = dryRight * 0.010f;
         
         // ---Left Channel DSP Engine---
         float erL = earlyReflectionsL.processSample(inputL);
