@@ -62,7 +62,11 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
-
+    
+    // 150 Hz Input HPF 
+    juce::dsp::IIR::Filter<float> hpfL;
+    juce::dsp::IIR::Filter<float> hpfR;
+    
     // Raw atomic parameter pointers for real-time DSP
     std::atomic<float>* dryWetParam = nullptr;
     std::atomic<float>* roomSizeParam = nullptr;

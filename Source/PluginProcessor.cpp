@@ -206,6 +206,17 @@ void CustomFreeverbAudioProcessor::prepareToPlay (double sampleRate, int samples
         
         apfL[i].prepare(scaledApfL, 0.5f);
         apfR[i].prepare(scaledApfR, 0.5f);
+        
+        // Configer 150 Hz HPF 2nd order
+        auto hpfCoeffs = juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, 150.0f);
+        *hpfL.coefficients = *hpfCoeffs;
+        *hpfR.coefficients = *hpfCoeffs;
+        
+        juce::dsp::ProcessSpec spec { sampleRate, static_cast<juce::uint32> (samplesPerBlock), 1};
+        hpfL.prepare (spec);
+        hpfR.prepare (spec);
+        hpfL.reset();
+        hpfR.reset();
     }
     
 
@@ -264,9 +275,14 @@ void CustomFreeverbAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
 
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
+        
         // Reading Left and Right Channels independetly
         float dryLeft = leftChannel[sample];
         float dryRight = (rightChannel != nullptr) ? rightChannel[sample] : dryLeft;
+        
+        // HPF inputs at 150 Hz
+        float hpFilteredL = hpfL.processSample (dryLeft);
+        float hpFilteredR = hpfR.processSample (dryRight);
         
         // Jezar's classic Freeverb input tuning factor is 0.015 ---> New scaling factor is 0.010 
         float inputL = dryLeft * 0.010f;
