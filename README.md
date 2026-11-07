@@ -20,7 +20,7 @@ To validate the acoustic performance of the 12×6 coprime matrix, a 1-sample Dir
 * **Transient Stability:** The absence of late-tail amplitude spikes confirms high echo density without discrete flutter echoes.
 
 ### 2. Time-Frequency Spectrogram & Damping
-![Reverb Spectrogram](docs/assets/IR_spectrogram.png)
+![Reverb Spectrogram](docs/assets/Spectrogram.png)
 
 * **High-Frequency Damping:** High frequencies ($>10\text{ kHz}$) exhibit accelerated energy dissipation, accurately simulating room air absorption.
 * **Sub-Bass Attenuation:** Energy below $150\text{ Hz}$ is suppressed by the input High-Pass Filter, preserving FOH subwoofer headroom.
