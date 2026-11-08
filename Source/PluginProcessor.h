@@ -73,13 +73,13 @@ private:
     
     // Left Channel DSP Chain
     EarlyReflections earlyReflectionsL;
-    CombFilter lbcfL[8];
-    AllPassFilter apfL[4];
+    CombFilter lbcfL[12];
+    AllPassFilter apfL[6];
     
     // Right Channel DSP Chain
     EarlyReflections earlyReflectionsR;
-    CombFilter lbcfR[8];
-    AllPassFilter apfR[4];
+    CombFilter lbcfR[12];
+    AllPassFilter apfR[6];
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomFreeverbAudioProcessor)
 };
