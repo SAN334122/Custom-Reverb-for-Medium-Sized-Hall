@@ -190,7 +190,7 @@ void CustomFreeverbAudioProcessor::prepareToPlay (double sampleRate, int samples
     float initialFeedback = initialRoomSize * 0.28f + 0.70f;
 
     // Scaling delay lengths for Left and Right channels
-    for(int i = 0; i < 8; ++i)
+    for(int i = 0; i < 12; ++i)
     {
         int scaledCombL = static_cast<int>(std::round(baseCombLengths[i] * scaleFactor));
         int scaledCombR = static_cast<int>(std::round((baseCombLengths[i] + baseStereoSpread) * scaleFactor));
@@ -199,7 +199,7 @@ void CustomFreeverbAudioProcessor::prepareToPlay (double sampleRate, int samples
         lbcfR[i].prepare(scaledCombR, initialFeedback, 0.20f);
     }
     
-    for(int i = 0; i < 4; ++i)
+    for(int i = 0; i < 6; ++i)
     {
         int scaledApfL = static_cast<int>(std::round(baseApfLengths[i] * scaleFactor));
         int scaledApfR = static_cast<int>(std::round((baseApfLengths[i] + baseStereoSpread) * scaleFactor));
@@ -262,7 +262,7 @@ void CustomFreeverbAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
        float combFeedback = (roomSize * 0.28f) + 0.70f;
        
        // Update comb filter feedback gains
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 12; ++i) {
         lbcfL[i].setFeedback(combFeedback);
         lbcfR[i].setFeedback(combFeedback);
     }
@@ -291,22 +291,22 @@ void CustomFreeverbAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
         // ---Left Channel DSP Engine---
         float erL = earlyReflectionsL.processSample(inputL);
         float lbcfSumL = 0.0f;
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < 12; ++i) {
             lbcfSumL += lbcfL[i].processSample(inputL);
         }
         float apfOutL = lbcfSumL;
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 6; ++i) {
             apfOutL = apfL[i].processSample(apfOutL);
         }
         
         // --- RIGHT CHANNEL DSP ENGINE ---
         float erR = earlyReflectionsR.processSample(inputR);
         float lbcfSumR = 0.0f;
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < 12; ++i) {
             lbcfSumR += lbcfR[i].processSample(inputR);
         }
         float apfOutR = lbcfSumR;
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 6; ++i) {
             apfOutR = apfR[i].processSample(apfOutR);
         }
         
